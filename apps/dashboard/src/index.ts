@@ -170,13 +170,19 @@ app.post("/api/pull", async (req, res) => {
           },
         },
         disputables,
-        personalInfoCandidates: [], // parser doesn't extract personal info yet — UI fills manually
+        personalInfoCandidates: [], // parser doesn't surface PI dispute candidates yet — UI lets them add manually
         prefilledClient: {
-          fullName: body.clientName,
-          address: "",
-          cityStateZip: "",
-          dob: "",
-          ssnLast4: "",
+          // Use the parser's extracted name if it's more complete than what
+          // the user typed in the form (e.g., includes middle initial).
+          fullName: iiqReport.personalInfo.fullName.length > body.clientName.length
+            ? iiqReport.personalInfo.fullName
+            : body.clientName,
+          address: iiqReport.personalInfo.street,
+          cityStateZip: iiqReport.personalInfo.cityStateZip,
+          dob: iiqReport.personalInfo.dateOfBirth,
+          // IIQ masks SSN — fall back to whatever the user entered on the
+          // login form (we already have it in `body.last4`).
+          ssnLast4: body.last4 ?? "",
         },
       });
     }

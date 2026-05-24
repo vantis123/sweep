@@ -31,8 +31,18 @@ export interface IIQPdfAccount {
   perBureau: Record<IIQPdfBureau, IIQPdfBureauDetail>;
 }
 
+/** Personal-info fields extracted from the top "Personal Information" section.
+ *  Pre-resolved across bureaus (longest non-empty value wins per field). */
+export interface IIQPdfPersonalInfo {
+  fullName: string;
+  dateOfBirth: string;
+  street: string;
+  cityStateZip: string;
+}
+
 export interface IIQPdfReport {
   accounts: IIQPdfAccount[];
+  personalInfo: IIQPdfPersonalInfo;
 }
 
 interface TI {
@@ -194,7 +204,118 @@ export async function parseIIQPdf(pdfBuffer: Uint8Array): Promise<IIQPdfReport> 
     accounts.push({ creditor, perBureau });
   }
 
-  return { accounts };
+  // Extract the Personal Information section (first page or two of the PDF)
+  // for prefill in the dashboard. Picks the best non-empty value per field
+  // across TU/EX/EQ — usually all three bureaus carry the same name, but
+  // Equifax sometimes has a middle initial that TU/EX lack.
+  const personalInfo = extractPersonalInfo(lines, cols);
+
+  return { accounts, personalInfo };
+}
+
+function extractPersonalInfo(
+  lines: TI[][],
+  cols: { tu: number; ex: number; eq: number },
+): IIQPdfPersonalInfo {
+  const bureauFromX = (x: number): IIQPdfBureau => {
+    const d = [
+      { b: "transunion" as IIQPdfBureau, v: Math.abs(x - cols.tu) },
+      { b: "experian" as IIQPdfBureau, v: Math.abs(x - cols.ex) },
+      { b: "equifax" as IIQPdfBureau, v: Math.abs(x - cols.eq) },
+    ];
+    d.sort((a, b) => a.v - b.v);
+    return d[0]!.b;
+  };
+
+  // Find the Personal Information block. Look for the section heading.
+  let piStart = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i]!.map((it) => it.text).join(" ");
+    if (/^Personal Information$/i.test(t.trim())) {
+      piStart = i;
+      break;
+    }
+  }
+  if (piStart < 0) return { fullName: "", dateOfBirth: "", street: "", cityStateZip: "" };
+
+  // Walk down until we hit a section that's clearly past personal info
+  // ("Credit Score" / "Summary" / "Account History"). Collect bureau-keyed
+  // values for each label we care about.
+  const valuesByBureau: Record<string, Record<IIQPdfBureau, string[]>> = {};
+  let currentLabel = "";
+  for (let i = piStart + 1; i < lines.length && i < piStart + 60; i++) {
+    const line = lines[i]!;
+    const t = line.map((it) => it.text).join(" ").trim();
+    if (/^(Credit Score|Summary|Account History|Inquiries|Public Records)/i.test(t)) break;
+    const labelItem = line.find((it) => /:$/.test(it.text));
+    if (labelItem) {
+      currentLabel = labelItem.text.replace(/:$/, "").trim();
+    }
+    if (!currentLabel) continue;
+    // Map non-label items to bureaus by x-position
+    for (const it of line) {
+      if (it === labelItem) continue;
+      const text = it.text.trim();
+      if (!text || text === "-") continue;
+      // Skip bureau-header tokens
+      if (/^(TransUnion|Experian|Equifax)$/i.test(text)) continue;
+      // Skip the section-block headers/intros
+      if (text.length > 80) continue;
+      const bureau = bureauFromX(it.x);
+      valuesByBureau[currentLabel] = valuesByBureau[currentLabel] ?? {
+        transunion: [], experian: [], equifax: [],
+      };
+      valuesByBureau[currentLabel]![bureau].push(text);
+    }
+  }
+
+  // Helper: pick the longest non-empty value across bureaus for a label.
+  const pickBest = (label: string): string => {
+    const v = valuesByBureau[label];
+    if (!v) return "";
+    const candidates: string[] = [];
+    for (const b of BUREAUS) {
+      const joined = v[b].join(" ").trim();
+      if (joined) candidates.push(joined);
+    }
+    if (candidates.length === 0) return "";
+    candidates.sort((a, b) => b.length - a.length);
+    return candidates[0]!;
+  };
+
+  // Name + DOB are single-token-per-bureau fields → pickBest works directly.
+  const fullName = pickBest("Name");
+  // DOB: prefer entries with a "/" (full date) over year-only.
+  const dobBureauVals = valuesByBureau["Date of Birth"];
+  let dateOfBirth = "";
+  if (dobBureauVals) {
+    for (const b of BUREAUS) {
+      const v = dobBureauVals[b].join(" ").trim();
+      if (v && v.includes("/")) { dateOfBirth = v; break; }
+    }
+    if (!dateOfBirth) dateOfBirth = pickBest("Date of Birth");
+  }
+  // Current Address: 3+ tokens per bureau (street, city/state, zip, maybe date).
+  // Use TU's first 3 lines if present, else EX, else EQ.
+  let street = "";
+  let cityStateZip = "";
+  const addrBureauVals = valuesByBureau["Current Address(es)"];
+  if (addrBureauVals) {
+    for (const b of BUREAUS) {
+      const lines = addrBureauVals[b];
+      if (lines.length === 0) continue;
+      // First line that doesn't look like a date or zip-only is street
+      const streetCandidate = lines.find((s) => !/^\d{2}\/\d{4}$/.test(s) && !/^[A-Z]{2}\s*\d{5}/.test(s) && !/^\d{5}/.test(s));
+      const cityStateCandidate = lines.find((s) => /,\s*[A-Z]{2}/.test(s));
+      const zipCandidate = lines.find((s) => /^\d{5}(-\d{4})?$/.test(s));
+      if (streetCandidate) {
+        street = streetCandidate;
+        cityStateZip = [cityStateCandidate, zipCandidate].filter(Boolean).join(" ").trim();
+        break;
+      }
+    }
+  }
+  return { fullName, dateOfBirth, street, cityStateZip };
 }
 
 /**
