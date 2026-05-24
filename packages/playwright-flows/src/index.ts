@@ -59,11 +59,31 @@ async function runFlow(
   log(`Bank capture — ${platform.toUpperCase()} — ${opts.username}`);
   log(`Headed: ${headed} · sandbox: ${sandboxDir}`);
 
-  const browser = await chromium.launch({ headless: !headed });
+  // Anti-bot-detection setup. IIQ and the new FSN tabbed UI both fingerprint
+  // for Playwright/headless via navigator.webdriver, missing plugins, etc.
+  // Without these flags + initScript, IIQ returns blank pages and FSN renders
+  // a collapsed layout that's missing the d-grid CSS classes parseFSN3B keys
+  // off of. Same setup as apps/dashboard/test/validate-live-pulls.ts which is
+  // the parser's known-good test harness.
+  const browser = await chromium.launch({
+    headless: !headed,
+    args: [
+      "--window-size=1920,1200",
+      "--disable-blink-features=AutomationControlled",
+    ],
+  });
   const context = await browser.newContext({
-    viewport: { width: 1366, height: 900 },
+    viewport: { width: 1920, height: 1200 },
     userAgent:
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+    acceptDownloads: true,
+  });
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+    Object.defineProperty(navigator, "languages", { get: () => ["en-US", "en"] });
+    Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] });
+    // @ts-ignore
+    window.chrome = { runtime: {} };
   });
   const page = await context.newPage();
 
