@@ -11,6 +11,7 @@
   "scripts": {
     "start": "npm run start --workspace=@sweep/dashboard",
     "dashboard": "npm run start --workspace=@sweep/dashboard",
+    "mcp": "npm run start --workspace=@sweep/mcp-server",
     "postinstall": "playwright install chromium",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
