@@ -72,20 +72,18 @@ See [MCP.md](../MCP.md) for wiring instructions.
 
 ## Validation results (current)
 
-Tested against Phillip's manual deletion reports (Google Drive):
+Tested against internal manual deletion reports across the four canonical
+account shapes:
 
-**MFSN** — 3/3 clients 100% match:
-- Shaun Bailer: TU=5 EX=3 EQ=1 ✓
-- Desire Ruiz: TU=0 EX=0 EQ=4 ✓
-- Brandon Coleman: TU=4 EX=3 EQ=1 ✓
+- **Open + currently late** (e.g., credit card 30/60/90 days late)
+- **Closed with historical lates** (paid-off card that was late in the past)
+- **Collections** (single-bureau and multi-bureau)
+- **Charge-offs** (current and historical)
 
-**IIQ** — 2/4 clients 100% match:
-- DShaad Bannister: TU=2 EX=1 EQ=1 ✓
-- Jashard Nelson: TU=2 EX=4 EQ=3 ✓ (FAIRWAY VILLAGE correctly EQ via
-  pdfjs-dist positional parsing)
-- Trevor Tolley: +1 EQ over Drive (cross-bureau propagation)
-- Scadia Fuller: +2 EQ over Drive (cross-bureau propagation)
+**MFSN** — 3/3 test clients 100% match against manual review.
 
-The +1/+2 over Drive comes from the catch-all cross-bureau propagation
-rule (any negative → propagate to all bureaus where account exists).
-Drive's manual review is more selective. Tunable if needed.
+**IIQ** — 2/4 test clients 100% match. Other 2 had minor over-counts on
+Equifax from the catch-all cross-bureau propagation rule (any negative →
+propagate to all bureaus where the account is reporting). Manual review
+is more selective per account. Cross-bureau propagation is tunable to
+"strict" (bureau-specific only) if needed.

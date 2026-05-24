@@ -5,7 +5,7 @@
  * Phillip's Drive Client Files.
  *
  *   SUPABASE_URL=... SUPABASE_KEY=... \
- *     NAMES='michonda,bannister,tolley,scadia,jashard,shaun bailer,adam vitek,desire ruiz,brandon coleman,justine' \
+ *     NAMES='client-name-1,client-name-2,...' \
  *     npx tsx apps/dashboard/test/validate-live-pulls.ts
  */
 

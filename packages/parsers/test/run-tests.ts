@@ -105,7 +105,7 @@ assert(
 console.log("\nRunning FSN parser tests against Adam's report...");
 const fsnText = readFileSync(resolve(FIXTURES, "fsn-adam.txt"), "utf-8");
 const fsnReport = parseFSN(fsnText);
-summarize("FSN — Adam Vitek", fsnReport);
+summarize("FSN — fixture report", fsnReport);
 
 assert(fsnReport.platform === "fsn", "FSN platform set");
 assert(fsnReport.errors.length === 0, "FSN no errors");
