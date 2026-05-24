@@ -39,9 +39,13 @@ interface FSNSite {
   loginUrl: string;
 }
 
+// Legacy site first — every real Skool client is on member.myfreescorenow.com.
+// The "new" app.myfreescorenow.com is the marketing/enrollment site that
+// always punts existing members to a "you don't have an active subscription"
+// dead-end. Trying it first wastes ~15-25s on every login.
 const FSN_SITES: FSNSite[] = [
-  { label: "new", loginUrl: "https://app.myfreescorenow.com/login" },
   { label: "legacy", loginUrl: "https://member.myfreescorenow.com/login" },
+  { label: "new", loginUrl: "https://app.myfreescorenow.com/login" },
 ];
 
 const REPORT_URLS = [
@@ -367,6 +371,7 @@ export async function fsnCaptureReport(
   // The 3B report page defaults to a new layout that has no per-account
   // expanders. There's a "Switch to Classic View" toggle that flips back to
   // the legacy expandable list — that's the layout parseFSN was built for.
+  let switchedToClassic = false;
   for (const sel of [
     'button:has-text("Switch to Classic View")',
     'a:has-text("Switch to Classic View")',
@@ -377,10 +382,20 @@ export async function fsnCaptureReport(
       await el.waitFor({ state: "visible", timeout: 2000 });
       await el.click();
       ctx.log(`  -> Switched to Classic View via ${sel}`);
-      await sleep(4000);
-      await dismissFsnQuickTour(ctx);
+      await sleep(1500);
+      switchedToClassic = true;
       break;
     } catch {}
+  }
+
+  // Fast path for the Classic View: the full 3B report is server-rendered in
+  // a CSS Grid layout — no lazy loading, no expanders to click. Skip the
+  // scroll-trigger + print-button + per-tradeline loop entirely. parseFSN3B
+  // picks up the HTML directly via cheerio.
+  if (switchedToClassic) {
+    await snap(ctx, ctx.page, "fsn-credit-report");
+    const html = await ctx.page.content();
+    return { text: html, source: "fsn-legacy-3b" };
   }
 
   ctx.log("  -> Scrolling to trigger lazy content");
