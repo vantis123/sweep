@@ -1,0 +1,23 @@
+{
+  "name": "@sweep/playwright-flows",
+  "version": "0.0.1",
+  "description": "Playwright login + report-pull flows for FSN and IIQ — headed by default",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "echo 'Phase 2 — tests not written yet'",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "pdf-parse": "^2.4.5",
+    "playwright": "^1.48.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,40 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+dist/
+build/
+.next/
+out/
+coverage/
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Sweep runtime data — contains client creds + parsed reports, never commit
+.sweep-data/
+.sweep-sandbox/
+.sweep/
+client-letters/
+*.report.json
+
+# Generated letters output (per-client PDFs) — never commit real client letters
+letters/
+!packages/letter-engine/templates/*.pdf
+
+# Real client credit reports — kept local for parser dev, never committed
+packages/parsers/fixtures/*.txt
+packages/parsers/fixtures/*.json
+packages/parsers/fixtures/*.pdf
+!packages/parsers/fixtures/.gitkeep
+
+# Playwright artifacts
+playwright-report/
+test-results/
+.playwright/
+
+# IDE
+.vscode/
+.idea/
+*.swp

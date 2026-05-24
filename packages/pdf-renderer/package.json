@@ -1,0 +1,23 @@
+{
+  "name": "@sweep/pdf-renderer",
+  "version": "0.0.1",
+  "description": "Render Affidavit of Truth HTML to PDF (Playwright) and merge with static 605B + breach screenshot (pdf-lib)",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sweep/letter-engine": "*",
+    "pdf-lib": "^1.17.1",
+    "playwright": "^1.48.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}

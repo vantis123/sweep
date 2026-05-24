@@ -1,0 +1,29 @@
+{
+  "name": "@sweep/mcp-server",
+  "version": "0.0.1",
+  "description": "Sweep MCP server — exposes IIQ capture, account extraction, and per-bureau dispute letter generation",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "bin": {
+    "sweep-mcp": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sweep/parsers": "*",
+    "@sweep/playwright-flows": "*",
+    "@sweep/letter-engine": "*",
+    "@sweep/pdf-renderer": "*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "sweep",
+  "version": "0.0.1",
+  "description": "Sweep by Arvantis — three-bureau dispute letter generator for credit pros",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "start": "npm run start --workspace=@sweep/dashboard",
+    "dashboard": "npm run start --workspace=@sweep/dashboard",
+    "postinstall": "playwright install chromium",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "author": "Arvantis Tech",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "cheerio": "^1.2.0",
+    "handlebars": "^4.7.9",
+    "playwright": "^1.59.1"
+  }
+}

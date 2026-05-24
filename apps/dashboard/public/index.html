@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sweep · by Arvantis Tech</title>
+<link rel="stylesheet" href="/style.css" />
+<link rel="icon" href="data:," />
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="brand">
+      <div class="brand-mark">S</div>
+      <div>
+        <div class="brand-name">Sweep</div>
+        <div class="brand-sub">by Arvantis Tech</div>
+      </div>
+    </div>
+    <div class="tagline">Dispute letters · local · private</div>
+  </header>
+
+  <main class="main">
+    <section class="card form-card" id="formCard">
+      <h1>Pull a credit report</h1>
+      <p class="lede">Sweep logs into your client's MyFreeScoreNow or IdentityIQ, captures the report, and groups every negative item by bureau. You review, pick reasons, and Sweep generates three dispute letters ready to print and mail.</p>
+
+      <form id="pullForm" class="form">
+        <label class="field">
+          <span class="label">Platform</span>
+          <select name="platform" id="platform" required>
+            <option value="fsn">MyFreeScoreNow</option>
+            <option value="iiq">IdentityIQ</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span class="label">Username · email</span>
+          <input type="email" name="username" required autocomplete="off" placeholder="client@email.com" />
+        </label>
+
+        <label class="field">
+          <span class="label">Password</span>
+          <input type="password" name="password" required autocomplete="off" />
+        </label>
+
+        <label class="field" id="last4Field" style="display:none;">
+          <span class="label">Last 4 of SSN</span>
+          <input type="text" name="last4" pattern="\d{4}" maxlength="4" autocomplete="off" placeholder="0000" />
+          <span class="hint">IIQ security challenge — typically the client's last 4 SSN digits.</span>
+        </label>
+
+        <label class="field">
+          <span class="label">Client full name</span>
+          <input type="text" name="clientName" required autocomplete="off" placeholder="John Q Smith" />
+        </label>
+
+        <label class="field-row">
+          <input type="checkbox" name="headed" id="headed" checked />
+          <span>Show the browser as Sweep works (recommended)</span>
+        </label>
+
+        <button class="btn btn-primary" type="submit">
+          <span class="btn-label">Pull report</span>
+        </button>
+      </form>
+    </section>
+
+    <section class="card status-card hidden" id="statusCard">
+      <div class="spinner"></div>
+      <h2 id="statusHeadline">Working…</h2>
+      <p id="statusBody" class="status-body">Logging in and capturing the credit report. The browser window will pop up — leave it open until Sweep finishes.</p>
+    </section>
+
+    <section class="card review-card hidden" id="reviewCard">
+      <div class="review-header">
+        <div>
+          <div class="kicker">Review</div>
+          <h2>What's getting disputed</h2>
+          <p class="lede" id="reviewLede"></p>
+        </div>
+        <div class="score-row" id="scoreRow"></div>
+      </div>
+
+      <details class="section" open>
+        <summary><span class="section-num">01</span> Client information</summary>
+        <div class="section-body" id="clientFormBody">
+          <div class="grid-2">
+            <label class="field">
+              <span class="label">Full legal name</span>
+              <input type="text" id="ci_fullName" />
+            </label>
+            <label class="field">
+              <span class="label">Date of birth</span>
+              <input type="text" id="ci_dob" placeholder="MM/DD/YYYY" />
+            </label>
+            <label class="field grid-span">
+              <span class="label">Mailing address</span>
+              <input type="text" id="ci_address" />
+            </label>
+            <label class="field grid-span">
+              <span class="label">City, State, ZIP</span>
+              <input type="text" id="ci_cityStateZip" placeholder="City, ST 12345" />
+            </label>
+            <label class="field">
+              <span class="label">Last 4 of SSN</span>
+              <input type="text" id="ci_ssnLast4" maxlength="4" />
+            </label>
+            <label class="field">
+              <span class="label">Letter date</span>
+              <input type="text" id="ci_letterDate" placeholder="Today" />
+            </label>
+          </div>
+        </div>
+      </details>
+
+      <details class="section" open>
+        <summary><span class="section-num">02</span> Negative items + inquiries <span class="count-pill" id="itemsCount">0</span></summary>
+        <div class="section-body">
+          <p class="hint">Every charge-off, collection, late, hard inquiry, and public record. Uncheck what you don't want to dispute. Each checked item gets the reason you pick.</p>
+          <div class="table-wrap">
+            <table class="dispute-table" id="itemsTable">
+              <thead>
+                <tr>
+                  <th class="cb-col"></th>
+                  <th>Item</th>
+                  <th class="bureau-col">Bureau</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody id="itemsTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <details class="section">
+        <summary><span class="section-num">03</span> Personal information <span class="count-pill" id="piCount">0</span></summary>
+        <div class="section-body">
+          <p class="hint">Names, addresses, employers, phone numbers reported on file. Check anything wrong, pick a reason. Skip the section if nothing's off.</p>
+          <div class="table-wrap">
+            <table class="dispute-table" id="piTable">
+              <thead>
+                <tr>
+                  <th class="cb-col"></th>
+                  <th>Field</th>
+                  <th>Value on file</th>
+                  <th class="bureau-col">Bureau</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody id="piTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+
+      <div class="generate-row">
+        <button class="btn btn-primary" id="generateBtn" type="button">Generate three letters</button>
+        <button class="btn btn-ghost" id="backToFormBtn" type="button">Start over</button>
+      </div>
+    </section>
+
+    <section class="card result-card hidden" id="resultCard">
+      <div class="kicker">Done</div>
+      <h2>Three letters ready to mail</h2>
+      <p class="lede" id="resultLede"></p>
+      <div class="letter-links" id="letterLinks"></div>
+      <div class="result-actions">
+        <button class="btn btn-ghost" id="newClientBtn" type="button">Start a new client</button>
+      </div>
+    </section>
+
+    <section class="card error-card hidden" id="errorCard">
+      <h2>Sweep hit a snag</h2>
+      <p class="lede" id="errorBody"></p>
+      <button class="btn btn-ghost" id="errorReset" type="button">Try again</button>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Local · all processing happens on your machine.</span>
+    <span class="footer-mark">arvantis.tech</span>
+  </footer>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
