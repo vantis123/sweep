@@ -64,7 +64,9 @@ interface PullBody {
   username: string;
   password: string;
   last4?: string;
-  clientName: string;
+  /** Optional override. If omitted, the client name (and folder slug) come
+   *  from the report's Personal Information section after capture. */
+  clientName?: string;
   headed?: boolean;
 }
 
@@ -91,11 +93,11 @@ app.get("/api/reasons", (_req, res) => {
 app.post("/api/pull", async (req, res) => {
   const body = req.body as PullBody;
 
-  if (!body.platform || !body.username || !body.password || !body.clientName) {
+  if (!body.platform || !body.username || !body.password) {
     return res.status(400).json({
       ok: false,
       stage: "validate",
-      error: "platform, username, password, and clientName are required",
+      error: "platform, username, and password are required",
     });
   }
 
@@ -154,9 +156,15 @@ app.post("/api/pull", async (req, res) => {
         category: d.category,
         detail: d.detail,
       }));
+      // Client name: prefer the report's extracted name, fall back to whatever
+      // override the user supplied, last resort "client" (so slug is never empty).
+      const fullName =
+        iiqReport.personalInfo.fullName ||
+        body.clientName ||
+        "client";
       return res.json({
         ok: true,
-        clientSlug: slug(body.clientName),
+        clientSlug: slug(fullName),
         capturedReportPath: cap.pdfPath, // so /api/generate can drop a copy in the client folder
         report: {
           platform: "iiq",
@@ -172,11 +180,7 @@ app.post("/api/pull", async (req, res) => {
         disputables,
         personalInfoCandidates: [], // parser doesn't surface PI dispute candidates yet — UI lets them add manually
         prefilledClient: {
-          // Use the parser's extracted name if it's more complete than what
-          // the user typed in the form (e.g., includes middle initial).
-          fullName: iiqReport.personalInfo.fullName.length > body.clientName.length
-            ? iiqReport.personalInfo.fullName
-            : body.clientName,
+          fullName,
           address: iiqReport.personalInfo.street,
           cityStateZip: iiqReport.personalInfo.cityStateZip,
           dob: iiqReport.personalInfo.dateOfBirth,
@@ -202,10 +206,12 @@ app.post("/api/pull", async (req, res) => {
     }
     const disputables = listDisputables(report);
     const personalInfoCandidates = listPersonalInfo(report);
-    const prefilledClient = prefillClient(report, body.clientName);
+    const prefilledClient = prefillClient(report, body.clientName ?? "");
+    // Slug from the extracted full legal name; fall back to override or "client".
+    const slugBase = prefilledClient.fullName || body.clientName || "client";
     return res.json({
       ok: true,
-      clientSlug: slug(body.clientName),
+      clientSlug: slug(slugBase),
       capturedReportPath: cap.pdfPath, // so /api/generate can drop a copy in the client folder
       report: {
         platform: report.platform,
@@ -368,31 +374,52 @@ function prefillClientFromIIQ(accounts: IIQAccount[], fallbackName: string): Cli
 
 function prefillClient(report: ReturnType<typeof parseFSNAny>, name: string): ClientInfo {
   const pi = report.personalInfo;
-  const firstOf = (m?: Partial<Record<string, string>>): string =>
-    (m && (m.experian ?? m.equifax ?? m.transunion)) || "";
-  const ssn = firstOf(pi.ssnLast4 as Partial<Record<string, string>>);
-  const name0 = firstOf(pi.name as Partial<Record<string, string>>) || name;
-  const addr = firstOf(pi.currentAddress as Partial<Record<string, string>>);
-  // Address typically arrives as "123 Main St, City, ST 12345" — split on last comma.
+  // Pick the LONGEST non-empty value across bureaus (one bureau may carry a
+  // middle initial that others lack, full ZIP+4 vs 5-digit, etc).
+  const bestOf = (m?: Partial<Record<string, string>>): string => {
+    if (!m) return "";
+    const values = [m.transunion, m.experian, m.equifax].filter(
+      (s): s is string => typeof s === "string" && s.trim().length > 0,
+    );
+    if (values.length === 0) return "";
+    values.sort((a, b) => b.length - a.length);
+    return values[0]!.trim();
+  };
+  const ssn = bestOf(pi.ssnLast4 as Partial<Record<string, string>>);
+  const name0 = bestOf(pi.name as Partial<Record<string, string>>) || name;
+  const addr = bestOf(pi.currentAddress as Partial<Record<string, string>>);
+  // FSN format from parseFSN3B is "<street>, <city>, <ST> <zip>" with commas
+  // joining the bureau's address-block lines. Split into street + city/state/zip.
   let address = addr;
   let cityStateZip = "";
-  const lastComma = addr.lastIndexOf(",");
-  if (lastComma > -1) {
-    const secondLastComma = addr.lastIndexOf(",", lastComma - 1);
-    if (secondLastComma > -1) {
-      address = addr.slice(0, secondLastComma).trim();
-      cityStateZip = addr.slice(secondLastComma + 1).trim();
+  const parts = addr.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    // City/state/zip is the last 1-2 parts depending on how FSN structured it.
+    // If the last token looks like "STATE ZIP" use it as city/state/zip and the
+    // rest is the street.
+    const last = parts[parts.length - 1]!;
+    if (/[A-Z]{2}\s*\d{5}/i.test(last)) {
+      // "PALM BAY, FL 32907" → take last two parts joined
+      cityStateZip = parts.slice(-2).join(", ");
+      address = parts.slice(0, -2).join(", ");
+      if (!address) {
+        // Only 2 parts total: ["street", "city ST zip"]
+        address = parts[0]!;
+        cityStateZip = parts[1]!;
+      }
     } else {
-      address = addr.slice(0, lastComma).trim();
-      cityStateZip = addr.slice(lastComma + 1).trim();
+      address = parts.slice(0, -1).join(", ");
+      cityStateZip = last;
     }
   }
-  const birthYear = firstOf(pi.birthYear as Partial<Record<string, string>>);
+  const birthYear = bestOf(pi.birthYear as Partial<Record<string, string>>);
   return {
     fullName: name0,
     address,
     cityStateZip,
-    dob: birthYear ? `01/01/${birthYear}` : "",
+    // FSN typically only shows the year — keep it as-is so the student
+    // can see it and add MM/DD if needed.
+    dob: birthYear,
     ssnLast4: ssn,
   };
 }
