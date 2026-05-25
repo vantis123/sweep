@@ -82,78 +82,6 @@ export function parseFSN3B(html: string): CreditReport {
   const $ = cheerio.load(html);
   const accounts: Account[] = [];
 
-  // Personal Information lives in its own d-grid grid-cols-4 near the top.
-  // We identify it by the col-start-1 labels: it's the only grid that has
-  // both "Name" and "Date of Birth" labels.
-  const personalInfo: CreditReport["personalInfo"] = {};
-  const piGrid = $("div.d-grid.grid-cols-4").filter((_, el) => {
-    const labels = $(el)
-      .find("p.grid-cell.col-start-1")
-      .toArray()
-      .map((l) => $(l).text().replace(/\s+/g, " ").trim().toLowerCase());
-    return labels.some((l) => l.includes("name")) && labels.some((l) => l.includes("date of birth"));
-  }).first();
-  if (piGrid.length > 0) {
-    const labelByRow = new Map<number, string>();
-    piGrid.find("p.grid-cell.col-start-1").each((_, el) => {
-      const cls = $(el).attr("class") || "";
-      const m = cls.match(/row-start-(\d+)/);
-      if (!m) return;
-      // Personal-info label cells sometimes contain a <br> joining two labels
-      // (e.g., "Name<br>Also Known As:") — split and pick the first.
-      const raw = $(el).html() ?? "";
-      const firstLabel = raw.split(/<br\s*\/?\s*>/i)[0] ?? "";
-      const text = firstLabel.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim().toLowerCase();
-      if (text) labelByRow.set(parseInt(m[1]!, 10), text);
-    });
-    const piColForBureau: Record<Bureau, string> = {
-      transunion: "col-start-2",
-      experian: "col-start-3",
-      equifax: "col-start-4",
-    };
-    for (const bureau of BUREAUS) {
-      const col = piColForBureau[bureau];
-      piGrid.find(`p.grid-cell.${col}`).each((_, el) => {
-        const cls = $(el).attr("class") || "";
-        const m = cls.match(/row-start-(\d+)/);
-        if (!m) return;
-        const row = parseInt(m[1]!, 10);
-        if (row === 1) return; // bureau header
-        const label = labelByRow.get(row);
-        if (!label) return;
-        // Convert <br> to newlines so multi-line values stay readable.
-        const html = $(el).html() ?? "";
-        const value = html
-          .replace(/<br\s*\/?\s*>/gi, "\n")
-          .replace(/<[^>]+>/g, "")
-          .replace(/[ \t]+/g, " ")
-          .split("\n")
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0 && s !== "--")
-          .join("\n");
-        if (!value) return;
-        if (label.startsWith("name")) {
-          personalInfo.name = personalInfo.name ?? {};
-          personalInfo.name[bureau] = value.split("\n")[0]!;
-        } else if (label.startsWith("date of birth")) {
-          personalInfo.birthYear = personalInfo.birthYear ?? {};
-          // FSN often shows just the year (e.g., "1996") for DOB. Keep raw.
-          personalInfo.birthYear[bureau] = value.split("\n")[0]!;
-        } else if (label.startsWith("current address")) {
-          personalInfo.currentAddress = personalInfo.currentAddress ?? {};
-          // Join the lines with a comma so prefillClient can split on it.
-          personalInfo.currentAddress[bureau] = value.replace(/\n/g, ", ");
-        } else if (label.startsWith("previous address")) {
-          personalInfo.previousAddresses = personalInfo.previousAddresses ?? {};
-          personalInfo.previousAddresses[bureau] = value.split("\n");
-        } else if (label.startsWith("employer")) {
-          personalInfo.employer = personalInfo.employer ?? {};
-          personalInfo.employer[bureau] = value.split("\n")[0]!;
-        }
-      });
-    }
-  }
-
   // Each account block: a <strong data-uw-ignore-translate="true">CREDITOR</strong>
   // followed by a <div class="d-grid grid-cols-4">…</div>. The strong sits inside
   // a <p>, which is a sibling of the grid div.
@@ -360,7 +288,7 @@ export function parseFSN3B(html: string): CreditReport {
     accounts,
     inquiries: [],
     publicRecords: [],
-    personalInfo,
+    personalInfo: {},
     warnings: [],
     errors: [],
   };
